@@ -1,23 +1,26 @@
 name: "Update Folder-Level TOC"
-description: "Regenerates the TOC inside <root>/README.md for any root folder."
+description: "Rebuilds <root>/README.md so it lists sub-folder READMEs."
 
 inputs:
   token:
+    description: "GITHUB_TOKEN or PAT with write access to the calling repo"
     required: true
-    description: "GITHUB_TOKEN or PAT with write access"
   root:
+    description: "Top-level folder to scan (e.g. governing-documents)"
     required: true
-    description: "Path to the top-level folder (e.g. governing-documents)"
 
 runs:
   using: "composite"
   steps:
+
+    #-- 1. Check out the calling repository -------------------------------#
     - uses: actions/checkout@v4
       with:
         repository: ${{ github.repository }}
-        token: ${{ inputs.token }}
+        token:      ${{ inputs.token }}
         fetch-depth: 0
 
+    #-- 2. Run the Python script that rewrites the TOC --------------------#
     - name: Run updater
       shell: bash
       env:
@@ -25,15 +28,14 @@ runs:
       run: |
         python "${{ github.action_path }}/update_toc.py"
 
+    #-- 3. Commit and push if the README changed -------------------------#
     - name: Commit & push if changed
       shell: bash
+      env:
+        ROOT_DIR: ${{ inputs.root }}          # make variable visible here
       run: |
         git config user.name  "github-actions[bot]"
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
         if git diff --quiet; then
           echo "No TOC changes."
-        else
-          git add "${{ env.ROOT_DIR }}/README.md"
-          git commit -m "ci: auto-update TOC for ${{ env.ROOT_DIR }} [skip ci]"
-          git push
-        fi
