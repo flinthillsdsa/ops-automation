@@ -1,0 +1,39 @@
+name: "Update Folder-Level TOC"
+description: "Regenerates the TOC inside <root>/README.md for any root folder."
+
+inputs:
+  token:
+    required: true
+    description: "GITHUB_TOKEN or PAT with write access"
+  root:
+    required: true
+    description: "Path to the top-level folder (e.g. governing-documents)"
+
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        repository: ${{ github.repository }}
+        token: ${{ inputs.token }}
+        fetch-depth: 0
+
+    - name: Run updater
+      shell: bash
+      env:
+        ROOT_DIR: ${{ inputs.root }}
+      run: |
+        python "${{ github.action_path }}/update_toc.py"
+
+    - name: Commit & push if changed
+      shell: bash
+      run: |
+        git config user.name  "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        if git diff --quiet; then
+          echo "No TOC changes."
+        else
+          git add "${{ env.ROOT_DIR }}/README.md"
+          git commit -m "ci: auto-update TOC for ${{ env.ROOT_DIR }} [skip ci]"
+          git push
+        fi
